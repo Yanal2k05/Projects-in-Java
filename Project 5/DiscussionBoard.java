@@ -1,9 +1,6 @@
 /*
-Name: Yanal Abu Rahmmeh
-User: yaburahm
-student ID: 1284819
 How to compile: javac DiscussionBoard.java
-How to execute: java DiscussionBoard cis2430
+How to execute: java DiscussionBoard dboard
 */
 import java.util.*;
 import java.io.*;
