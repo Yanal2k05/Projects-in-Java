@@ -1,190 +1,283 @@
-import java.util.Scanner;
+/*
+Name: Yanal Abu Rahmmeh
+User: yaburahm
+student ID: 1284819
+How to compile: javac DiscussionBoard.java
+How to execute: java DiscussionBoard cis2430
+*/
+
+import java.util.*;
+import java.io.*; // need this for it to work, what it does basically is to import all the classes in the java.io package
+// import java.util.*; need this for it to work, what it does basically is to import all the classes in the java.util package
 
 public class DiscussionBoard {
-    private static final int MAX_POSTS = 10; // Maximum number of posts allowed
-    private static final String[] posts = new String[MAX_POSTS]; // Array to store posts
-    private static int pCount = 0; // Counter for the number of posts
+    private static ArrayList<User> users = new ArrayList<>();
+    private static ArrayList<Post> posts = new ArrayList<>();
 
     public static void main(String[] args) {
-        try (Scanner scanner = new Scanner(System.in)) {
-            boolean running = true; // Control flag for running the program
-            
-            // Main loop for the menu
-            while (running) {
-                displayMenu(); // Show options to the user
-                int option = scanner.nextInt(); // Get user's choice
-                scanner.nextLine(); // Consume newline character
-                
-                // Option 9 ends the program
-                if (option == 9) {
+        Scanner scanner = new Scanner(System.in);
+        String filename = (args.length > 0) ? "./boards/" + args[0] + ".dboard" : null;
+
+        if (filename != null && new File(filename).exists()) {
+            loadDiscussionBoard(filename);
+        } else {
+            System.out.println("No valid file specified. Starting with a blank discussion board.");
+        }
+
+        boolean running = true;
+        while (running) {
+            displayMenu();
+            int option = getValidIntegerInput(scanner, 1, 8);
+
+            // Always call nextLine() after nextInt() to consume the newline character
+            scanner.nextLine(); 
+
+            switch (option) {
+                case 1 -> createNewUser(scanner);
+                case 2 -> createNewPost(scanner);
+                case 3 -> viewAllPosts();
+                case 4 -> voteInPoll(scanner);
+                case 5 -> viewPostsByUsername(scanner);
+                case 6 -> viewPostsByKeyword(scanner);
+                case 7 -> saveDiscussionBoard(scanner);
+                case 8 -> {
                     System.out.println("Program ended.");
                     running = false;
-                } else {
-                    handleOption(scanner, option); // Handle the chosen option
                 }
             }
         }
     }
 
-    // Display the menu options
     private static void displayMenu() {
-        System.out.println("(1) Post new message");
-        System.out.println("(2) Print all posts");
-        System.out.println("(3) Print all posts in reverse order");
-        System.out.println("(4) Print number of posts entered so far");
-        System.out.println("(5) Print all posts from a user");
-        System.out.println("(6) Print the number of vowels across all posts");
-        System.out.println("(7) Perform a search of posts containing a given word (case sensitive)");
-        System.out.println("(8) Perform a search of posts containing a given word (case insensitive)");
-        System.out.println("(9) End Program");
-        System.out.print("Choose option: "); 
+        System.out.println("\n(1) Create new user");
+        System.out.println("(2) Create new post");
+        System.out.println("(3) View all posts");
+        System.out.println("(4) Vote in poll");
+        System.out.println("(5) View all posts with a given username");
+        System.out.println("(6) View all posts with a given keyword");
+        System.out.println("(7) Save Discussion Board");
+        System.out.println("(8) End Program");
+        System.out.print("Choose option: ");
     }
 
-    // Handle the option chosen by the user
-    private static void handleOption(Scanner scanner, int option) {
-        switch (option) {
-            case 1 -> postNewMessage(scanner); // Add a new post
-            case 2 -> printAllPosts(false); // Print all posts in normal order
-            case 3 -> printAllPostsInReverseOrder(); // Print posts in reverse order
-            case 4 -> printNumberOfPostsEnteredSoFar(); // Print the number of posts
-            case 5 -> printAllPostsFromUser(scanner); // Print all posts from a specific user
-            case 6 -> printNumberOfVowels(); // Count and print the total number of vowels
-            case 7 -> performCaseSensitiveWordSearch(scanner); // Case-sensitive word search
-            case 8 -> performCaseInsensitiveWordSearch(scanner); // Case-insensitive word search
-            default -> System.out.println("Invalid option."); // Handle invalid options
-        }
-    }
+    private static void createNewUser(Scanner scanner) {
+        System.out.print("Enter full name: ");
+        String fullName = scanner.nextLine();
+        System.out.print("Enter username (optional): ");
+        String username = scanner.nextLine();
 
-    // Post a new message to the board
-    private static void postNewMessage(Scanner scanner) {
-        if (pCount >= MAX_POSTS) { // Check if the board is full
-            System.out.println("Error. Board is full.");
-            return;
-        }
-        System.out.print("Enter name: ");
-        String name = scanner.nextLine().toLowerCase();  // Convert name to lowercase
-        System.out.print("Enter post: ");
-        String message = scanner.nextLine(); // Get the post message
-        posts[pCount] = formatPost(name, message); // Format and store the post
-        pCount++; // Increment the post count
-        System.out.println("Post added.");
-    }
-
-    // Format the post in the form "name says: message"
-    private static String formatPost(String name, String message) {
-        return name + " says: " + message;
-    }
-
-    // Print all posts, normal or in reverse order based on the 'reverse' flag
-    private static void printAllPosts(boolean reverse) {
-        if (pCount == 0) { // Check if there are no posts
-            System.out.println("No posts.");
+        if (users.stream().anyMatch(user -> user.username.equals(username.toLowerCase()))) {
+            System.out.println("Error: Username already exists.");
             return;
         }
 
-        if (reverse) { // Print in reverse order
-            for (int i = pCount - 1; i >= 0; i--) {
-                System.out.println(posts[i]);
+        User newUser = new User(fullName, username);
+        users.add(newUser);
+        System.out.println("User registered successfully.");
+    }
+
+    private static void createNewPost(Scanner scanner) {
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine().toLowerCase();
+
+        User user = users.stream().filter(u -> u.username.equals(username)).findFirst().orElse(null);
+        if (user == null) {
+            System.out.println("Error: User not registered.");
+            return;
+        }
+
+        String postType;
+        do {
+            System.out.print("Enter the post type ('text', 'poll'): ");
+            postType = scanner.nextLine().toLowerCase();
+            if (!postType.equals("text") && !postType.equals("poll")) {
+                System.out.println("Invalid post type. Please enter 'text' or 'poll'.");
             }
-        } else { // Print in normal order
-            for (int i = 0; i < pCount; i++) {
-                System.out.println(posts[i]);
-            }
+        } while (!postType.equals("text") && !postType.equals("poll"));
+
+        if (postType.equals("text")) {
+            System.out.print("Enter post title: ");
+            String title = scanner.nextLine();
+            System.out.print("Enter post content: ");
+            String content = scanner.nextLine();
+            TextPost newPost = new TextPost(user, title, content);
+            posts.add(newPost);
+            System.out.println("Text post added successfully.");
+        } else if (postType.equals("poll")) {
+            System.out.print("Enter poll title: ");
+            String title = scanner.nextLine();
+            System.out.print("Enter poll options (separated by semicolons): ");
+            String options = scanner.nextLine();
+            PollPost newPoll = new PollPost(user, title, options);
+            posts.add(newPoll);
+            System.out.println("Poll post added successfully.");
         }
     }
 
-    // Print posts in reverse order
-    private static void printAllPostsInReverseOrder() {
-        printAllPosts(true);
-    }
-
-    // Print the number of posts entered so far
-    private static void printNumberOfPostsEnteredSoFar() {
-        System.out.println("Total posts: " + pCount);
-    }
-
-    // Print all posts from a specific user
-    private static void printAllPostsFromUser(Scanner scanner) {
-        System.out.print("Enter username: ");
-        String user = scanner.nextLine().toLowerCase(); // Convert username to lowercase
-        for (String post : posts) {
-            if (post != null && post.toLowerCase().startsWith(user + " says:")) {
-                System.out.println(post.split(" says: ", 2)[1]); // Print the message part of the post
-            }
-        }
-    }
-
-    // Print the number of vowels in all posts
-    private static void printNumberOfVowels() {
-        int vowelCount = 0;
-        for (String post : posts) {
-            if (post != null) {
-                vowelCount += countVowelsInPost(post); // Count vowels in each post
-            }
-        }
-        System.out.println("Total vowels in post content: " + vowelCount);
-    }
-
-    // Count the number of vowels in a given post
-    private static int countVowelsInPost(String post) {
-        String messageContent = post.split(" says: ", 2)[1].toLowerCase(); // Get the message part
-        int count = 0;
-        for (char c : messageContent.toCharArray()) {
-            if ("aeiou".indexOf(c) != -1) { // Check if the character is a vowel
-                count++;
-            }
-        }
-        return count;
-    }
-
-    // Perform a case-sensitive word search in posts
-    private static void performCaseSensitiveWordSearch(Scanner scanner) {
-        System.out.print("Enter word to search: ");
-        String word = scanner.nextLine();
-        boolean found = false;
-        
-        for (String post : posts) {
-            if (post != null) {
-                String messageContent = post.split(" says: ", 2)[1]; // Get the message part
-                if (searchWordInMessage(messageContent, word, false)) { // Case-sensitive search
-                    System.out.println(post);
-                    found = true;
-                }
-            }
-        }
-
-        if (!found) {
+    private static void viewAllPosts() {
+        if (posts.isEmpty()) {
             System.out.println("No posts.");
-        }
-    }
-
-    // Perform a case-insensitive word search in posts
-    private static void performCaseInsensitiveWordSearch(Scanner scanner) {
-        System.out.print("Enter word to search: ");
-        String word = scanner.nextLine();
-        boolean found = false;
-
-        for (String post : posts) {
-            if (post != null) {
-                String messageContent = post.split(" says: ", 2)[1]; // Get the message part
-                if (searchWordInMessage(messageContent, word, true)) { // Case-insensitive search
-                    System.out.println(post);
-                    found = true;
-                }
-            }
-        }
-
-        if (!found) {
-            System.out.println("No posts.");
-        }
-    }
-
-    // Search for a word in the message content, with case sensitivity controlled by a flag
-    private static boolean searchWordInMessage(String message, String word, boolean caseInsensitive) {
-        if (caseInsensitive) {
-            return message.toLowerCase().contains(word.toLowerCase()); // Case-insensitive search
         } else {
-            return message.contains(word); // Case-sensitive search
+            posts.forEach(post -> System.out.println(post.display()));
         }
+    }
+
+    // New function: View all posts by a given username
+    private static void viewPostsByUsername(Scanner scanner) {
+        System.out.print("Enter the username: ");
+        String username = scanner.nextLine().toLowerCase();
+
+        boolean found = false;
+        for (Post post : posts) {
+            if (post.createdBy.username.equals(username)) {
+                System.out.println(post.display());
+                found = true;
+            }
+        }
+        if (!found) {
+            System.out.println("No posts found for the username: " + username);
+        }
+    }
+
+    // New function: View all posts containing a given keyword
+// New function: View all posts containing a given keyword
+private static void viewPostsByKeyword(Scanner scanner) {
+    System.out.print("Enter the keyword: ");
+    String keyword = scanner.nextLine().toLowerCase();
+
+    boolean found = false;
+    for (Post post : posts) {
+        // Split title into words and check if any word matches the keyword
+        String[] titleWords = post.title.toLowerCase().split("\\W+");  // Splitting by non-word characters
+        if (Arrays.asList(titleWords).contains(keyword)) {
+            System.out.println(post.display());
+            found = true;
+            continue;  // Move to the next post if title matches
+        }
+
+        // If it's a TextPost, split content into words and check for keyword match
+        if (post instanceof TextPost) {
+            String[] contentWords = ((TextPost) post).content.toLowerCase().split("\\W+");
+            if (Arrays.asList(contentWords).contains(keyword)) {
+                System.out.println(post.display());
+                found = true;
+            }
+        }
+    }
+    if (!found) {
+        System.out.println("No posts found containing the keyword: " + keyword);
+    }
+}
+
+
+    private static void voteInPoll(Scanner scanner) {
+        System.out.print("Enter post ID to vote: ");
+        int postId = getValidIntegerInput(scanner);
+
+        Post post = posts.stream().filter(p -> p.id == postId).findFirst().orElse(null);
+        if (post instanceof PollPost pollPost) {
+            System.out.println(pollPost.display());
+            System.out.print("Enter the option number to vote for: ");
+            int option = getValidIntegerInput(scanner, 1, pollPost.options.size()) - 1;
+            pollPost.vote(option);
+            System.out.println("Vote recorded.");
+        } else {
+            System.out.println("Error: Post is not a poll.");
+        }
+    }
+
+    private static void saveDiscussionBoard(Scanner scanner) {
+        System.out.print("Enter filename to save (or append) to: ");
+        String filename = "./boards/" + scanner.nextLine() + ".dboard";
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filename, true))) {
+            for (Post post : posts) {
+                if (post instanceof TextPost textPost) {
+                    writer.println("TEXTPOST;" + post.id + ";" + textPost.createdBy.username + ";" + textPost.title + ";" + textPost.content);
+                } else if (post instanceof PollPost pollPost) {
+                    writer.print("POLLPOST;" + post.id + ";" + pollPost.createdBy.username + ";" + pollPost.title + ";");
+                    pollPost.options.forEach((option, count) -> writer.print(option + ":" + count + ";"));
+                    writer.println();
+                }
+            }
+            System.out.println("Discussion board saved (appended).");
+        } catch (IOException e) {
+            System.out.println("Error saving file.");
+        }
+    }
+
+    private static void loadDiscussionBoard(String filename) {
+        File file = new File(filename);
+        if (!file.exists()) {
+            System.out.println("File not found. Starting with a blank discussion board.");
+            return;
+        }
+
+        try (Scanner fileScanner = new Scanner(file)) {
+            while (fileScanner.hasNextLine()) {
+                String line = fileScanner.nextLine().trim();
+                if (line.isEmpty()) continue; // Skip empty lines
+
+                String[] data = line.split(";");
+                if (data.length < 4) {
+                    System.out.println("Error: Invalid line format - " + line);
+                    continue; // Skip the line if it doesn't have enough data
+                }
+
+                String postType = data[0];
+                int postId = Integer.parseInt(data[1]);
+                String username = data[2];
+                String title = data[3];
+
+                User user = users.stream().filter(u -> u.username.equals(username)).findFirst().orElse(null);
+                if (user == null) {
+                    user = new User(username, username);
+                    users.add(user);
+                }
+
+                if (postType.equals("TEXTPOST")) {
+                    if (data.length < 5) {
+                        System.out.println("Error: Text post missing content - " + line);
+                        continue;
+                    }
+                    String content = data[4];
+                    TextPost textPost = new TextPost(user, title, content);
+                    textPost.id = postId;
+                    posts.add(textPost);
+                } else if (postType.equals("POLLPOST")) {
+                    if (data.length < 5) {
+                        System.out.println("Error: Poll post missing options - " + line);
+                        continue;
+                    }
+                    String optionsString = data[4];
+                    PollPost pollPost = new PollPost(user, title, optionsString);
+                    pollPost.id = postId;
+                    posts.add(pollPost);
+                } else {
+                    System.out.println("Error: Unknown post type - " + line);
+                }
+            }
+            System.out.println("Discussion board loaded from file.");
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File not found.");
+        }
+    }
+
+    private static int getValidIntegerInput(Scanner scanner) {
+        while (!scanner.hasNextInt()) {
+            System.out.print("Invalid input. Please enter a valid number: ");
+            scanner.next();
+        }
+        return scanner.nextInt();
+    }
+
+    private static int getValidIntegerInput(Scanner scanner, int min, int max) {
+        int input;
+        do {
+            input = getValidIntegerInput(scanner);
+            if (input < min || input > max) {
+                System.out.printf("Invalid input. Please enter a number between %d and %d: ", min, max);
+            }
+        } while (input < min || input > max);
+        return input;
     }
 }
